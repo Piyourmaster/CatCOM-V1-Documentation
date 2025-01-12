@@ -1,0 +1,182 @@
+ID:3194615 wip version
+
+based on the alu design shown in ID:3048145, and the readable writable memory in ID:3003229 and ID:3003532
+
+ID:3196482 published version
+
+Introduction:
+CatCOM V1 is a hobby computer made in the game the powder toy, utilizing filt's mechanics. 
+Some basic information:
+
+- Most of the data is stored in the form of filt ctype.
+- Filt ctypes can hold up to 30 bits, but BRAY requires atleast one bit to be on to exist. This means for all intents and purposes, there are 29 bits to work with
+- This computer took a bit more than a year to come to fruition from conception
+- First officially published January 10th, 2025
+
+It does not utilize subframe techniques, other than ordering and timing for compairisons.
+At the heart of the CatCOM V1 computer lies a ram, a rom, an alu, a series of switches and demultiplexers and a few important registers to keep in mind.
+
+====================================================
+1 Registers: There are 6 registers that are important to us. These are called A, B, ACCUMULATOR, FLAGS, ROMOUT and PROGRAM COUNTER. They all store their values in the form of filt ctypes.
+(Register is often shortened to reg)
+---------------------------------------------------------------------------------------------
+1.1 ROMOUT: also just called ROM, is the register that data is directly written into from the rom, and is what is used to call instructions, or refer to parts of memory and registers. That can also be called rom instructions. the data in ROMOUT will contain an opcode in the leftmost 5 bits (Excluding 0x20000000,) and 2 ram adresses in the bits 0xFFF000, adress a, and 0x000FFF, adress b, respectively to be referenced depending on the opcode. see section 2.2, "ROM" for more details. (Coming soon)
+
+1.2 PROGRAM COUNTER: The program counter, COUNTER, or COUNT for short, is incremented at the beginning of every machine cycle, immediately before a rom adress is called. The value in the program counter points to an adress in the rom to be read. It goes from 0x000 to 0xFFF, and uses 0x10000000 as a placeholder bit.
+
+using a JUMP or CJUMP command [OPCODE 0x14 and 0x15, (see sec 4.2 & 4.2.1)] sets the PROGRAM COUNTER to reg A before starting the next cycle, and because the counter gets incremented at the beginning of every cycle, before referencing a ram adress, it will actually jump to position (A data + 1) in ram. Similarly, you must jump to value 0xFFFFFFF (no placeholder bit) to refer to jumping to 0. ik this is silly.
+
+For that reason, a reset CatCOM V1 computer will have its program counter set to 0xFFFFFFF.
+
+1.3 A: When the rom writes to the ROMOUT register, that data is then read. The data in the bits 0x00FFF000, contains a ram adress, address a, and the data in that ram adress is then written to register A.
+You can write the data in register A to address B.
+
+1.4 B: Following register A being written to, bits 0x00000FFF of ROMOUT are used to reference a second adress in ram, adress b, and that data gets written to register B.
+You can write the data in ROMOUT, ACC, or FLAG to adress B
+
+1.5 ACCUMULATOR: also called ACC, The ACCUMULATOR register contains the results of any ALU operations that has been done. Once both A and B have been written, if ROMOUT's 0x10000000 bit is off, the alu will do an operation with register A and B, based on the opcode contained in ROMOUT. If the operation is an alu nop, the accumulator will not be updated
+
+1.6 FLAGS: FLAG for short, The FLAGS register contains extra information about any ALU operations that have been done.
+The FLAG register is updated any time the alu is called. It has 3 important bits, 0x1, 0x2, and 0x4.
+bit 0x1 is the 0 flag, and it will tell you if the data in the accumulator is 0 (1 for acc = 0, 0 for acc≠0). this will not be updated with an alu nop
+bit 0x2 is the negative flag, and says weather the data in the accumulator is negative. (1 for negative, 0 for positive.) this also will not be updated with an alu nop.
+and bit 0x4 is the equality flag, it will tell you if A and B are equal. this is updated any time the ALU is called.
+
+====================================================
+2 Components: There are 3 major components, some control circuitry, and some data busses that store registers.
+
+The Arithmatic Logic Unit, the ALU, whitch does arithmatic operations like addition and subtraction, and logic operations like bitwise anding, based on a given operation code.
+
+The Rom, whitch in each adress holds 2 ram adresses and an operation code to perform to be sequentially called and ran.
+
+The Ram, whitch can hold a 29 bit value in each of its adresses, 0x000 through 0xfff, and can read or write from those adresses every cycle.
+
+and decentralized control circuitry, responsible for interfacing with the ram, rom and alu, like switching ram adresses, the register a or b, and sending write data to the rom, deciding where to send signals, incrementing the program counter, handling jump command data and checking the condition in the CJMP command
+(see sec 1 for details on registers)
+---------------------------------------------------------------------------------------------
+2.1 ALU: When an ALU operation code is present in a cycles rom instructions, a signal will be sent to the alu, the ALU will complete an operation, update the flag and accumulator (see sec 1.5 & 1.6)), and then send the signal back to initiate a new cycle. 
+
+2.1.1 ALU INSTRUCTIONS
+The alu has 16 operations, 0x0 through 0xF, and it performs them on the data stored in registers B and A (see sec 1.3 & 1.4). A and B will represent that data in the following list.
+The results of these operations are put into the ACCUMULATOR register. (see sec 1.5)
+These operations are:
+
+opcode - operation - CatAsm
+0 - Perform no operation on A & B (see sec 1.5 & 1.6 for details)- NOP A,B
+1 - Bitwise A xor B - XOR A,B
+2 - Bitwise A and B - AND A,B
+3 - Bitwise A or B - OR A,B
+4 - Ones compliment of B - 1COMP A,B
+5 - Bitwise B and not A - NNOT A,B
+6 - Rightshift B by A's LSB - RSHFT A,B
+7 - Leftshift B by A's LSB - LSHFT A,B
+8 - Add A plus B - ADD A,B
+9 - Subtract B minus A - SUB A,B
+A - Increment B - INC A,B
+B - Decrement B - DEC A,B
+C - 2's compliment of B - 2COMP
+D - Output B - OUTB A,B
+E - Output A - OUTA A,B
+F - Output 0 - ZERO A,B
+
+2.2 ROM: The rom is located in the bottom lefthand corner of the screen.
+
+Calling the rom to read data to the ROMOUT register (see sec 1.1) is one of the first things that is done within the CatCOM’s system cycle (see sec 3). 
+
+First, a signal is sent to increment the value of the PROGRAM COUNTER register. That data points to an address on the rom, and is passed to the rom (see sec 1.2). Then a signal is sent to the rom to initiate reading the data at that adress. That data is then sent to the ROMOUT register, and then the signal is sent out of the ram [to the address selector, (see sec 2.4.2)] to complete the rest of the cycle.
+
+
+The rom holds 4096, 0xFFF + 1 instructions, or addresses, in the form of filt ctypes, to be sequentially read with the program counter. Each address holds 29 bits worth of data to be ran in a cycle, and 1 rightmost placeholder bit. 
+
+It is formatted such that:
+the first 5 bits from the right excluding the placeholder bit, (aka bits 0x1F000000,) is an opcode to be ran, 
+the next 9 bits, (bits 0x00FFF000) is the ram address of the data to be loaded into register A. We’ll call that Address A. 
+And the last 9 bits contain the ram address of the data to be loaded into register B, and the ram address to be written to for instructions 0x10-0x13. We’ll call that address B
+
+The physical data block in the rom starts from the bottom righthand corner, at address 0x000, and increases by one every pixel you move upwards until the top of the block. Every subsequent column to the left is the same as the first row + (0x40 * how many columns you are to the left)
+
+2.3 RAM: The ram holds 4096, 0xFFF + 1 addresses, in the form of filt ctypes, to be read from twice every cycle. In the rom instructions (see sec 2.2) Address A refers to the first ram address referenced, and address B refers to the second ram address referenced, per cycle. The first time the ram receives a signal in a cycle, it writes Address A’s data to Register A. The second time it receives a signal, it writes Address B’s data to Register B, and then writes a value to Address B if the operation calls for it.
+
+2.4 Control Circuitry: There are a few main pieces of control circuitry to be aware of. The program counter incrementer, the address selector loop, and the instruction selection demultiplexers.
+
+2.4.1 Program Counter Incrementer: WIP
+
+2.4.2 Address Selector Loop: WIP
+
+2.4.3 Instruction Selection Demultiplexers: WIP
+
+====================================================
+3 System Cycle and Instruction Pipeline: 
+
+====================================================
+4 CatCOM V1 Machine Code and CatAsm: Machine code is what your computer is reading to do computations, and Assembly languages are essentially shorthand for machine code that programmers can use to more easily read and write in machine code, and typically assembly languages have interpreters for converting between machine code. Similarly CatCOM V1 Machine code is the code the CatCOM V1 reads to execute computations, and CatCOM V1 CatASM is an assembly language shorthand for CatCOM V1’s machine code. It lacks an interpreter (coming soon) but having a shorthand makes it much easier to write code for the CatCOM, even if it’s hand interpereted.
+---------------------------------------------------------------------------------------------
+4.1 Data structure and Data Architecture:
+For every rom address:
+Bits 0x1F000000 is the opcode
+Bits 0x00FFF000 is ram Address A, and references the data to be loaded into register A
+Bits 0x00000FFF is ram Address B, and references the data to be loaded into register B
+(see sec 1.1,1.2,2.2) 
+
+For every ram address:
+Any value from 0x00000000 (with a placeholder bit anywhere) to 0x3FFFFFFF may be stored in any ram adress. However, if the placeholder bit 0x20000000 is missing, this may lead to some unintended consequences.
+
+4.2 Instruction set:
+There are 0x1F instructions to choose from.
+Any time any instruction is ran, the data stored in ram adress A and ram adress B gets written to registers A and B, regardless of if anything is done with them.
+
+excluding the rightmost bit:
+
+ALU instructions (see sec 2.1 & 2.1.1) range from 0x00 to 0x0F, and when executed, they route through the ALU to perform some operation using registers A and B. the results are outputted into the ACCUMULATOR, and flags are updated. a signal is then sent to complete the cycle.
+
+Control Circuitry instructions range from 0x10 to 0x1F, but instructions greater than 0x15 are control NOP operations. They route a signal through a few demultiplexers to perform functions like moving data from one ram address to another, then the signal gets sent to complete the cycle.
+
+The Conditional jump operation requires a load buffer operation referencing the same address A and address B to function properly (see section) This operation can be anything, so long as it references the same addresses, but the quickest operation to use is a CNOP, as routing through the control circuitry is faster than routing through the alu. 
+
+
+4.2.1 Operation Code List:
+
+Including rightmost placeholder bit:
+opcode - operation - CatAsm AddressA,AddressB
+
+ALU INSTRUCTIONS:
+
+0x20 - Perform no operation on A & B with the ALU (see sec 1.5 & 1.6 for details) - NOP A,B
+0x21 - Bitwise A xor B - XOR A,B
+0x22 - Bitwise A and B - AND A,B
+0x23 - Bitwise A or B - OR A,B
+0x24 - Ones compliment of B - 1COMP A,B
+0x25 - Bitwise B and not A - NNOT A,B
+0x26 - Rightshift B by A's LSB - RSHFT A,B
+0x27 - Leftshift B by A's LSB - LSHFT A,B
+0x28 - Add A plus B - ADD A,B
+0x29 - Subtract B minus A - SUB A,B
+0x2A - Increment B - INC A,B
+0x2B - Decrement B - DEC A,B
+0x2C - 2's compliment of B - 2COMP
+0x2D - Output B - OUTB A,B
+0x2E - Output A - OUTA A,B
+0x2F - Output 0 - ZERO A,B
+
+CONTROL CIRCUITRY INSTRUCTIONS:
+
+
+0x30 - Move data in Reg A to Address B - MOV A,B
+0x31 - Move data in Reg ROM to Address B - MOVROM A,B
+0x32 - Move data in Reg ACC to Address B - MOVACC A,B
+0x33 - Move data in Reg FLAG to Address B - MOVFLAG A,B
+0x34 - Jump COUNTER to value in Reg A + 1 (see sec 1.2)- JMP A,B
+0x35 - Jump COUNTER to value in Reg A + 1 if the first bit of data in Reg B is 1 (see sec 1.2) - CJMP A,B
+0x36 - Perform no operation on A&B with control circuitry - CNOP A,B
+0x37 - Perform no operation on A&B with control circuitry - CNOP A,B
+0x38 - Perform no operation on A&B with control circuitry - CNOP A,B
+0x39 - Perform no operation on A&B with control circuitry - CNOP A,B
+0x3A - Perform no operation on A&B with control circuitry - CNOP A,B
+0x3B - Perform no operation on A&B with control circuitry - CNOP A,B
+0x3C - Perform no operation on A&B with control circuitry - CNOP A,B
+0x3D - Perform no operation on A&B with control circuitry - CNOP A,B
+0x3E - Perform no operation on A&B with control circuitry - CNOP A,B
+0x3F - Perform no operation on A&B with control circuitry - CNOP A,B
+====================================================
+
+
