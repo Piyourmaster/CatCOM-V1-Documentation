@@ -106,7 +106,7 @@ The physical data block in the rom starts from the bottom righthand corner, at a
 2.4.3 Instruction Selection Demultiplexers: WIP
 
 ====================================================
-3 System Cycle and Instruction Pipeline: 
+3 System Cycle: 
 
 ====================================================
 4 CatCOM V1 Machine Code and CatAsm: Machine code is what your computer is reading to do computations, and Assembly languages are essentially shorthand for machine code that programmers can use to more easily read and write in machine code, and typically assembly languages have interpreters for converting between machine code. Similarly CatCOM V1 Machine code is the code the CatCOM V1 reads to execute computations, and CatCOM V1 CatASM is an assembly language shorthand for CatCOM V1’s machine code. It lacks an interpreter (coming soon) but having a shorthand makes it much easier to write code for the CatCOM, even if it’s hand interpereted.
