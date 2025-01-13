@@ -22,7 +22,7 @@ At the heart of the CatCOM V1 computer lies a ram, a rom, an alu, a series of sw
 ---------------------------------------------------------------------------------------------
 1.1 ROMOUT: also just called ROM, is the register that data is directly written into from the rom, and is what is used to call instructions, or refer to parts of memory and registers. That can also be called rom instructions. the data in ROMOUT will contain an opcode in the leftmost 5 bits (Excluding 0x20000000,) and 2 ram adresses in the bits 0xFFF000, adress a, and 0x000FFF, adress b, respectively to be referenced depending on the opcode. see section 2.2, "ROM" for more details. (Coming soon)
 
-1.2 PROGRAM COUNTER: The program counter, COUNTER, or COUNT for short, is incremented at the beginning of every machine cycle, immediately before a rom adress is called. The value in the program counter points to an adress in the rom to be read. It goes from 0x000 to 0xFFF, and uses 0x10000000 as a placeholder bit.
+1.2 PROGRAM COUNTER: The program counter, COUNTER, or COUNT for short, is incremented at the beginning of every machine cycle, immediately before a rom adress is called. The value in the program counter points to an adress in the rom to be read. Those adresses go from 0x000 to 0xFFF, and uses 0x10000000 as a placeholder bit. (see sec 2.4.1)
 
 using a JUMP or CJUMP command [OPCODE 0x14 and 0x15, (see sec 4.2 & 4.2.1)] sets the PROGRAM COUNTER to reg A before starting the next cycle, and because the counter gets incremented at the beginning of every cycle, before referencing a ram adress, it will actually jump to position (A data + 1) in ram. Similarly, you must jump to value 0xFFFFFFF (no placeholder bit) to refer to jumping to 0. ik this is silly.
 
@@ -93,20 +93,30 @@ the first 5 bits from the right excluding the placeholder bit, (aka bits 0x1F000
 the next 9 bits, (bits 0x00FFF000) is the ram address of the data to be loaded into register A. We’ll call that Address A. 
 And the last 9 bits contain the ram address of the data to be loaded into register B, and the ram address to be written to for instructions 0x10-0x13. We’ll call that address B
 
-The physical data block in the rom starts from the bottom righthand corner, at address 0x000, and increases by one every pixel you move upwards until the top of the block. Every subsequent column to the left is the same as the first row + (0x40 * how many columns you are to the left)
+The physical data block in the rom starts from the bottom righthand corner, at address 0x000, and increases by one every pixel you move upwards until the top of the block. Every subsequent column to the left is the same as the first row + (0x40 * how many columns you are to the left) 
 
 2.3 RAM: The ram holds 4096, 0xFFF + 1 addresses, in the form of filt ctypes, to be read from twice every cycle. In the rom instructions (see sec 2.2) Address A refers to the first ram address referenced, and address B refers to the second ram address referenced, per cycle. The first time the ram receives a signal in a cycle, it writes Address A’s data to Register A. The second time it receives a signal, it writes Address B’s data to Register B, and then writes a value to Address B if the operation calls for it.
 
 2.4 Control Circuitry: There are a few main pieces of control circuitry to be aware of. The program counter incrementer, the address selector loop, and the instruction selection demultiplexers.
 
-2.4.1 Program Counter Incrementer: WIP
+2.4.1 Program Counter Incrementer: The program counter incrementer as its name suggests, increments the program counter to progress the position in the program (see sec 1.2 & 2.2). It can also receive a data input, to set the program counter to a specified value. 
+It is the very first step in the sysyem cycle, and when sent a signal the value of the program counter is increased by 1, then the program counter is passed to the rom. in the event of an adress overflow, (a value in the program counter equal to 0x10001000,) the program counter will be set to the last thing it was set to with a jump or cjump command (in the event of no jump command having been used previously, it will be set to 0x0FFFFFFF, witch next time the incrementer gets called will increase to 0x10000000)
 
 2.4.2 Address Selector Loop: WIP
 
 2.4.3 Instruction Selection Demultiplexers: WIP
 
 ====================================================
-3 System Cycle: 
+3 System Cycle: The system cycle is the sequence of events the computer regularly performs to complete operations.
+The system cycle signal pathway is the path through which the signal used to run components takes through the computer each cycle.
+---------------------------------------------------------------------------------------------
+3.1 System Cycle Signal Pathway: The system cycle begins at the program counter incrementer, where a signal is first sent to begin running the computer. That signal is then routed through the rom. 
+
+It then gets passed to the address selector loop for the first time, where the signal then branches. 
+
+One signal gets passed to the first set of instruction demultiplexers, where if the opcode calls for it (instructions > 0x0F) they can do some function on B when it has arrived, and the other signal gets sent to the ram to Load adress A from ram. The ram then passes its signal back to the address selector loop, where the signal branches again. One signal is sent to the ram to load adress B. The other signal gets routed through the second set of instruction demultiplexers, where the signal is either routed through the ALU (instructions < 0x0F) or passed back to the program counter incrementer to begin another cycle(instructions > 0x0F), depending on the opcode. If the signal is routed through the alu,  the alu will choose some signal path with internal demultiplexers depending on the opcode, then use the signal to update the accumulator, and a branch off of that to update the flag. Finally the signal used to update the accumulator will be sent back to the program counter incrementer to begin another cycle.
+
+3.2 Data Flow:WIP
 
 ====================================================
 4 CatCOM V1 Machine Code and CatAsm: Machine code is what your computer is reading to do computations, and Assembly languages are essentially shorthand for machine code that programmers can use to more easily read and write in machine code, and typically assembly languages have interpreters for converting between machine code. Similarly CatCOM V1 Machine code is the code the CatCOM V1 reads to execute computations, and CatCOM V1 CatASM is an assembly language shorthand for CatCOM V1’s machine code. It lacks an interpreter (coming soon) but having a shorthand makes it much easier to write code for the CatCOM, even if it’s hand interpereted.
