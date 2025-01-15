@@ -119,7 +119,16 @@ One signal gets passed to the first set of instruction demultiplexers, where if 
 3.2 Data Flow:WIP
 
 ====================================================
-4 CatCOM V1 Machine Code and CatAsm: Machine code is what your computer is reading to do computations, and Assembly languages are essentially shorthand for machine code that programmers can use to more easily read and write in machine code, and typically assembly languages have interpreters for converting between machine code. Similarly CatCOM V1 Machine code is the code the CatCOM V1 reads to execute computations, and CatCOM V1 CatASM is an assembly language shorthand for CatCOM V1’s machine code. It lacks an interpreter (coming soon) but having a shorthand makes it much easier to write code for the CatCOM, even if it’s hand interpereted.
+4 CatCOM V1 Machine Code and CatAsm: Machine code is what your computer is reading to do computations, and Assembly languages are essentially shorthand for machine code that programmers can use to more easily read and write in machine code, and typically assembly languages have interpreters for converting between machine code. 
+Similarly CatCOM V1 Machine code is the code the CatCOM V1 reads to execute computations, and CatCOM V1 CatASM is an assembly language shorthand for CatCOM V1’s machine code. It lacks an interpreter (coming soon) but having a shorthand makes it much easier to write code for the CatCOM, even if it’s hand interpreted. 
+
+Any CatCOM printed or written code should provide:
+1: Data in rom and it’s corresponding addresses,
+&
+2: Data preloaded in ram and it's corresponding addresses.
+(see sec 5.0.1 for a basic example)
+It should clearly state what is rom data and what is preloaded ram data, and rom data should at least include either a CatASM shorthand or an operation code, and 2, 3 digit hexadecimal address codes for addresses to be referenced in ram, in order, (Address A, Address B) for each rom address. (see sec 2.2 & 2.3)
+
 ---------------------------------------------------------------------------------------------
 4.1 Data structure and Data Architecture:
 For every rom address:
@@ -129,11 +138,11 @@ Bits 0x00000FFF is ram Address B, and references the data to be loaded into regi
 (see sec 1.1,1.2,2.2) 
 
 For every ram address:
-Any value from 0x00000000 (with a placeholder bit anywhere) to 0x3FFFFFFF may be stored in any ram adress. However, if the placeholder bit 0x20000000 is missing, this may lead to some unintended consequences.
+Any value from 0x00000000 (with a placeholder bit anywhere) to 0x3FFFFFFF may be stored in any ram address. However, if the placeholder bit 0x20000000 is missing, this may lead to some unintended consequences.
 
 4.2 Instruction set:
 There are 0x1F instructions to choose from.
-Any time any instruction is ran, the data stored in ram adress A and ram adress B gets written to registers A and B, regardless of if anything is done with them.
+Any time any instruction is ran, the data stored in ram address A and ram address B gets written to registers A and B, regardless of if anything is done with them.
 
 excluding the rightmost bit:
 
@@ -175,8 +184,8 @@ CONTROL CIRCUITRY INSTRUCTIONS:
 0x31 - Move data in Reg ROM to Address B - MOVROM A,B
 0x32 - Move data in Reg ACC to Address B - MOVACC A,B
 0x33 - Move data in Reg FLAG to Address B - MOVFLAG A,B
-0x34 - Jump COUNTER to value in Reg A + 1 (see sec 1.2)- JMP A,B
-0x35 - Jump COUNTER to value in Reg A + 1 if the first bit of data in Reg B is 1 (see sec 1.2) - CJMP A,B
+0x34 - Jump COUNTER to value in Reg A + 1 (see sec 1.2 & 2.4.1)- JMP A,B
+0x35 - Jump COUNTER to value in Reg A + 1 if the first bit of data in Reg B is 1 (see sec 1.2 & 2.4.1) - CJMP A,B
 0x36 - Perform no operation on A&B with control circuitry - CNOP A,B
 0x37 - Perform no operation on A&B with control circuitry - CNOP A,B
 0x38 - Perform no operation on A&B with control circuitry - CNOP A,B
@@ -188,5 +197,73 @@ CONTROL CIRCUITRY INSTRUCTIONS:
 0x3E - Perform no operation on A&B with control circuitry - CNOP A,B
 0x3F - Perform no operation on A&B with control circuitry - CNOP A,B
 ====================================================
+5 Code examples:
+
+5.0.1 Theory program 1:
+
+PROGRAM:
+
+PROGRAM ROM:
+Rom Address		CatASM	A	B
+0x000			ADD		000,000
+# the first step in this program is adding the data in ram address 0x000 with itself. The results of this arithmetic operation, like all other arithmetic operations, is then stored in the accumulator. Upon the first iteration, ram address 0x000 is 1, so 1+1=2, 2 is stored in the accumulator.
+0x001			MOVACC 	000,000
+# the second step in this program is writing that result in the accumulator back to ram address 0x000. So if the previous step was 1+1, ram adress 0x000 will now equal 2.
+0x002			JMP		001,000
+# The third and final step of this program is setting program counter to the data stored in ram address 0x001, thereby jumping to the position immediately after that in the program. Since ram address equals 0x0FFFFFFF, [Which references program position 0, rom address 0x000, (see sec 1.2 & 2.4.1),] the program jumps back to the beginning, with an updated ram adress 0x000.
+
+PRELOADED IN RAM:
+Address	Ram Data
+0x000		0x20000001
+# is just a 1, to be used for step 1 of iteration 1. a value that isn't preloaded need not be stated. 
+0x001		0x0FFFFFFF
+# ram adress 0x001 is a number that refers to the beginning of a program, to be used in a jump operation.
+
+5.1 Program 1: 
+Name: 
+Fibbonacci to 0xA00
+
+Description: 
+calculates fibbonacci’s sequence to the nth term, and outputs that term to 0xFFF. n is stored in 0xA00
+
+PROGRAM:
+
+PROGRAM ROM:
+
+Machine code:
+Rom Address		Rom Data
+			Op	A	B
+0x000			0x30	500	000	
+0x001			0x30	501	001
+0x002			0x30	501	002
+0x003			0x30	A00	003
+0x004			0x30	500	004
+0x005			0x20	004	003
+0x006			0x33	000	800
+0x007			0x27	502	800
+0x008			0x32	000	800
+0x009			0x20	503	800
+0x00A			0x35	503	800
+0x00B			0x28	000	001
+0x00C			0x32	000	002
+0x00D			0x30	000	001
+0x00E			0x30	002	000
+0x00F			0x2A	000	004
+0x010			0x32	000	004
+0x011			0x34	502	000
+0x012			0x30	000	FFF
+0x013			0x34	503	000
+
+Car
+
+PRELOADED IN RAM:
+Address	Ram Data
+0x500		0x20000001
+0x501		0x20000000
+0x502		0x20000004
+0x503		0x20000011
+0xA00		a user input number between 0x200000001 and 0x2000002B inclusive 
+
+
 
 
